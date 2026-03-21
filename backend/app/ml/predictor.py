@@ -11,10 +11,14 @@ detector = AnomalyDetector()
 
 
 def initialize_predictor() -> bool:
-    """Carga el modelo al iniciar la aplicación."""
+    """Carga los modelos al iniciar la aplicación."""
     loaded = detector.load_model()
     if not loaded:
-        logger.warning("Sin modelo ML, usando detección por reglas")
+        logger.warning("Sin modelo ML de anomalías, usando detección por reglas")
+    if detector.classifier_model is not None:
+        logger.info("Clasificador de ataques disponible")
+    else:
+        logger.warning("Sin clasificador de ataques")
     return loaded
 
 

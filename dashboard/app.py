@@ -35,12 +35,14 @@ def dashboard():
     stats = api_get("/api/stats/summary") or {}
     alerts = api_get("/api/alerts/", {"limit": 10}) or {"items": [], "total": 0}
     events = api_get("/api/events/", {"limit": 5}) or {"items": [], "total": 0}
+    ml_status = api_get("/api/ml/status") or {}
     return render_template(
         "dashboard.html",
         stats=stats,
         alerts=alerts["items"],
         events=events["items"],
         total_events=events["total"],
+        ml_status=ml_status,
     )
 
 
@@ -56,6 +58,13 @@ def alerts_page():
     """Panel de alertas."""
     alerts = api_get("/api/alerts/", {"limit": 100}) or {"items": [], "total": 0}
     return render_template("alerts.html", alerts=alerts["items"], total=alerts["total"])
+
+
+@app.route("/ml")
+def ml_page():
+    """Estado y métricas de los modelos de ML."""
+    ml_status = api_get("/api/ml/status") or {}
+    return render_template("ml.html", ml_status=ml_status)
 
 
 @app.route("/reports/pdf")

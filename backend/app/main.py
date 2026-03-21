@@ -9,6 +9,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import alerts, events, reports, stats
+from app.api import ml as ml_api
 from app.config import settings
 from app.core.alert_engine import AlertEngine
 from app.core.detector import AnomalyDetector
@@ -16,6 +17,7 @@ from app.core.enricher import enrich_event
 from app.core.ingester import LogIngester
 from app.core.normalizer import normalize_event
 from app.core.parser import LogParser
+from app.core.sequence_analyzer import SequenceAnalyzer
 from app.database import AsyncSessionLocal, engine
 from app.ml.predictor import initialize_predictor
 from app.models.alert import Alert as AlertModel
@@ -29,6 +31,7 @@ logger = logging.getLogger(__name__)
 parser = LogParser()
 alert_engine = AlertEngine()
 detector = AnomalyDetector()
+sequence_analyzer = SequenceAnalyzer()
 
 # Cola async para procesar líneas de log
 log_queue: asyncio.Queue = asyncio.Queue()
@@ -59,10 +62,18 @@ async def process_pipeline() -> None:
             # 3. Enrich (GeoIP, AbuseIPDB)
             enriched = await enrich_event(normalized)
 
-            # 4. Detect anomalías
+            # 4. Detect anomalías (Isolation Forest)
             is_anomaly, score = detector.predict(enriched)
             enriched["is_anomaly"] = is_anomaly
             enriched["severity_score"] = score
+
+            # 4b. Clasificar tipo de ataque (Random Forest)
+            classification = detector.classify_attack(enriched)
+            if classification["confidence"] > 0.5:
+                enriched.setdefault("message_parsed", {})
+                if enriched["message_parsed"] is None:
+                    enriched["message_parsed"] = {}
+                enriched["message_parsed"]["ml_classification"] = classification
 
             # 5. Persistir en DB
             async with AsyncSessionLocal() as session:
@@ -70,7 +81,7 @@ async def process_pipeline() -> None:
                 session.add(event)
                 await session.flush()
 
-                # 6. Evaluar alertas
+                # 6. Evaluar alertas (reglas)
                 alert_data = await alert_engine.evaluate(enriched)
                 if alert_data:
                     alert = AlertModel(
@@ -86,6 +97,26 @@ async def process_pipeline() -> None:
                         "alert_type": alert.alert_type,
                         "description": alert.description,
                         "source_ip": alert.source_ip,
+                    })
+
+                # 6b. Analizar secuencias temporales por IP
+                seq_alert = await sequence_analyzer.record_and_analyze(enriched)
+                if seq_alert:
+                    seq_alert_model = AlertModel(
+                        id=uuid.uuid4(),
+                        event_id=event.id,
+                        severity=seq_alert["severity"],
+                        alert_type=seq_alert["alert_type"],
+                        description=seq_alert["description"],
+                        source_ip=seq_alert.get("source_ip"),
+                    )
+                    session.add(seq_alert_model)
+                    await ws_manager.broadcast_alert({
+                        "id": str(seq_alert_model.id),
+                        "severity": seq_alert_model.severity,
+                        "alert_type": seq_alert_model.alert_type,
+                        "description": seq_alert_model.description,
+                        "source_ip": seq_alert_model.source_ip,
                     })
 
                 await session.commit()
@@ -119,8 +150,9 @@ async def lifespan(app: FastAPI):
     # Cargar modelo ML
     initialize_predictor()
 
-    # Conectar Redis (alert engine)
+    # Conectar Redis (alert engine + sequence analyzer)
     await alert_engine.connect()
+    await sequence_analyzer.connect()
 
     # Iniciar worker del pipeline
     pipeline_task = asyncio.create_task(process_pipeline())
@@ -148,6 +180,7 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
     await alert_engine.close()
+    await sequence_analyzer.close()
     await engine.dispose()
 
 
@@ -172,6 +205,7 @@ app.include_router(events.router, prefix="/api/events", tags=["events"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
+app.include_router(ml_api.router, prefix="/api/ml", tags=["ml"])
 
 
 @app.get("/")
