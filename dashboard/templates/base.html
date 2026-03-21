@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Log Analyzer AI{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0f172a',
+                        secondary: '#1e293b',
+                        accent: '#334155',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                        success: '#22c55e',
+                        info: '#3b82f6',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; }
+        .card { transition: transform 0.2s; }
+        .card:hover { transform: translateY(-2px); }
+        @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+    </style>
+</head>
+<body class="bg-primary text-gray-100 min-h-screen">
+    <!-- Navbar -->
+    <nav class="bg-secondary border-b border-accent sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <a href="{{ PREFIX }}/" class="flex items-center gap-3">
+                <span class="text-2xl">🛡️</span>
+                <span class="text-xl font-bold text-white">Log Analyzer <span class="text-danger">AI</span></span>
+            </a>
+            <div class="flex items-center gap-6">
+                <a href="{{ PREFIX }}/" class="hover:text-danger transition-colors {% if request.path == '/' %}text-danger font-semibold{% endif %}">Dashboard</a>
+                <a href="{{ PREFIX }}/events" class="hover:text-danger transition-colors {% if request.path == '/events' %}text-danger font-semibold{% endif %}">Eventos</a>
+                <a href="{{ PREFIX }}/alerts" class="hover:text-danger transition-colors {% if request.path == '/alerts' %}text-danger font-semibold{% endif %}">Alertas</a>
+                <a href="{{ PREFIX }}/reports/pdf" class="bg-danger hover:bg-red-600 px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+                    📄 Reporte PDF
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Content -->
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-accent mt-12 py-6 text-center text-gray-500 text-sm">
+        Log Analyzer AI v0.1.0 &mdash; Sistema de Detección de Anomalías con Inteligencia Artificial
+    </footer>
+</body>
+</html>
