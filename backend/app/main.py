@@ -13,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from sqlalchemy import select
 
-from app.api import alerts, events, geo, reports, stats
+from app.api import alerts, events, geo, reports, settings_api, stats
 from app.api import ml as ml_api
 from app.api import auth as auth_api
 from app.auth import get_current_user, hash_password
@@ -264,6 +264,7 @@ app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(ml_api.router, prefix="/api/ml", tags=["ml"])
 app.include_router(geo.router, prefix="/api/geo", tags=["geo"])
+app.include_router(settings_api.router, prefix="/api/settings", tags=["settings"])
 
 
 @app.get("/")

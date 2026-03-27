@@ -90,3 +90,40 @@ async def list_users(
     """Listar usuarios (solo admin)."""
     result = await db.execute(select(User).order_by(User.created_at))
     return result.scalars().all()
+
+
+@router.put("/password")
+async def change_password(
+    current_password: str,
+    new_password: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Cambiar contrasena del usuario actual."""
+    if not verify_password(current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Contrasena actual incorrecta")
+
+    user.hashed_password = hash_password(new_password)
+    db.add(user)
+    logger.info("Contrasena cambiada: %s", user.username)
+    return {"status": "ok", "message": "Contrasena actualizada"}
+
+
+@router.delete("/users/{username}")
+async def delete_user(
+    username: str,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Eliminar usuario (solo admin, no puede eliminarse a si mismo)."""
+    if username == admin.username:
+        raise HTTPException(status_code=400, detail="No puedes eliminarte a ti mismo")
+
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    await db.delete(user)
+    logger.info("Usuario eliminado: %s por %s", username, admin.username)
+    return {"status": "ok", "message": f"Usuario {username} eliminado"}
