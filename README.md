@@ -1,6 +1,28 @@
 # VigIA — Analizador de Logs con Inteligencia Artificial
 
-Sistema de analisis de logs de servidores Linux con IA para deteccion automatica de anomalias y ataques de seguridad. Genera alertas en tiempo real y reportes ejecutivos PDF.
+## Finalidad
+
+VigIA es una herramienta de ciberseguridad disenada para **monitorear, analizar y proteger servidores Linux en tiempo real**. Su objetivo principal es detectar de forma automatica amenazas de seguridad, intentos de intrusion y comportamientos anomalos en los logs del sistema operativo, aplicaciones web y servicios de red.
+
+### Problema que resuelve
+
+Los administradores de sistemas enfrentan un volumen masivo de logs diarios (cientos de miles de lineas) que es imposible revisar manualmente. Los ataques de fuerza bruta, inyecciones SQL, escaneos de puertos y accesos no autorizados pueden pasar desapercibidos entre el ruido normal del servidor. VigIA automatiza este proceso usando **Inteligencia Artificial** para:
+
+- **Detectar anomalias** que escapan a las reglas tradicionales, mediante modelos de Machine Learning (Isolation Forest) que aprenden el comportamiento normal del servidor y alertan cuando algo se desvía.
+- **Clasificar ataques** automaticamente usando Random Forest, categorizando amenazas en tipos como fuerza bruta SSH, SQL injection, directory traversal, entre otros.
+- **Analizar secuencias de ataque multi-paso**, identificando patrones como reconocimiento seguido de fuerza bruta seguido de acceso.
+- **Alertar en tiempo real** via WebSocket, permitiendo respuesta inmediata ante incidentes.
+- **Generar reportes ejecutivos PDF** con estadisticas de seguridad para documentacion y auditoria.
+
+### Casos de uso
+
+- Monitoreo de seguridad en servidores de produccion (VPS, dedicados, cloud)
+- Deteccion de intentos de fuerza bruta SSH y ataques web
+- Auditoria de comandos sudo y accesos privilegiados
+- Dashboard centralizado de seguridad para equipos de infraestructura
+- Herramienta de apoyo para proyectos academicos de ciberseguridad e IA aplicada
+
+---
 
 ## Arquitectura
 
@@ -12,7 +34,7 @@ Sistema de analisis de logs de servidores Linux con IA para deteccion automatica
         |
         v
 [Parser] -- regex multi-formato --> extrae campos estructurados
-        |
+        |       (soporta formato clasico y ISO 8601 de rsyslog)
         v
 [Normalizer] --> JSON unificado (schema LogEvent)
         |
@@ -51,7 +73,7 @@ Sistema de analisis de logs de servidores Linux con IA para deteccion automatica
 
 - Docker + Docker Compose v2
 - Git
-- Servidor Linux con logs en `/var/log/`
+- Servidor Linux con logs en `/var/log/` (rsyslog recomendado para generar auth.log y syslog)
 
 ## Instalacion
 
@@ -74,6 +96,8 @@ docker compose exec backend alembic upgrade head
 # El usuario admin se crea automaticamente al iniciar el backend
 ```
 
+> **Nota:** En servidores Debian 12+ que usan solo systemd journal, es necesario instalar rsyslog (`apt install rsyslog`) para que se generen los archivos `/var/log/auth.log` y `/var/log/syslog` que VigIA monitorea.
+
 ## Puertos (por defecto, solo 127.0.0.1)
 
 | Servicio | Puerto |
@@ -84,7 +108,17 @@ docker compose exec backend alembic upgrade head
 | Frontend (Vue 3) | 3010 |
 | Nginx (reverse proxy) | 8088 |
 
-> Todos los puertos estan bindeados a `127.0.0.1` por seguridad. Se accede a traves de Apache como reverse proxy con SSL.
+> Todos los puertos estan bindeados a `127.0.0.1` por seguridad. Se accede a traves de Apache/Nginx externo como reverse proxy con SSL.
+
+## Dashboard y Vistas
+
+| Vista | Ruta | Descripcion |
+|-------|------|-------------|
+| Dashboard | `/` | Tarjetas de estadisticas, grafico de eventos por tipo, grafico de severidad, alertas recientes |
+| Eventos | `/events` | Tabla de eventos con filtros (tipo, IP, anomalia) y paginacion |
+| Reportes | `/reports` | Descarga de reportes ejecutivos en PDF |
+| Machine Learning | `/ml` | Estado de los modelos (Isolation Forest + Random Forest), feature engineering, distribucion de eventos, re-entrenamiento |
+| Login | `/login` | Autenticacion con JWT |
 
 ## Autenticacion
 
@@ -131,6 +165,7 @@ Todos los endpoints (excepto auth/login y health) requieren JWT Bearer token.
 - `ssh_login_accepted` — Login SSH exitoso
 - `ssh_login_failed` — Intento de login SSH fallido
 - `ssh_invalid_user` — Intento con usuario inexistente
+- `ssh_connection_closed` — Conexion SSH cerrada (escaneos, fuerza bruta)
 - `sudo_command` — Comando ejecutado con sudo
 - `apache_access` — Acceso HTTP (Apache Combined Log Format)
 - `syslog` — Eventos genericos de syslog
@@ -150,14 +185,27 @@ Todos los endpoints (excepto auth/login y health) requieren JWT Bearer token.
 
 **Dual ML Pipeline:**
 
-1. **Isolation Forest** — Deteccion no supervisada de anomalias
-2. **Random Forest** — Clasificacion supervisada de tipos de ataque
+1. **Isolation Forest** — Deteccion no supervisada de anomalias. Aprende el comportamiento normal del servidor y marca como anomalo cualquier evento que se desvie significativamente del patron aprendido.
+2. **Random Forest Classifier** — Clasificacion supervisada de tipos de ataque. Categoriza eventos sospechosos en clases como fuerza bruta, SQL injection, directory traversal, acceso normal, etc.
 
 **Feature Engineering** (15 dimensiones):
-- Severidad, tipo SSH, nivel de error, status HTTP
-- Entropia del mensaje, patrones temporales (hora/dia)
-- Longitud de URL, caracteres especiales, profundidad de path
-- Frecuencia por IP, diversidad de endpoints
+
+| Feature | Descripcion |
+|---------|-------------|
+| severity_score | Score de severidad del evento (0.0 - 1.0) |
+| is_high_risk_event | Evento de alto riesgo (SSH fallido, usuario invalido) |
+| is_medium_risk_event | Evento de riesgo medio (sudo, SSH cerrado) |
+| is_error_level | Nivel ERROR o CRITICAL |
+| is_warning_level | Nivel WARNING |
+| has_source_ip | Tiene IP de origen |
+| hour_sin / hour_cos | Patron temporal ciclico de la hora |
+| is_night | Evento nocturno (22:00 - 06:00) |
+| is_weekend | Evento en fin de semana |
+| http_status_normalized | Codigo HTTP normalizado |
+| url_length_normalized | Longitud de URL normalizada |
+| url_suspicious_score | Score de sospecha en URL (traversal, SQLi) |
+| message_entropy | Entropia del mensaje (complejidad) |
+| has_username | Tiene nombre de usuario asociado |
 
 Cuando no hay modelo entrenado, el sistema usa deteccion por reglas heuristicas como fallback.
 
@@ -193,7 +241,7 @@ vigIA/
 │   └── alembic/          # Migraciones DB
 ├── frontend/             # Vue 3 + Pinia + Tailwind CSS
 │   └── src/
-│       ├── views/        # Login, Home, Events, Reports
+│       ├── views/        # Login, Home, Events, Reports, ML
 │       ├── components/   # Dashboard, EventsTable, AlertsPanel, StatsChart, SeverityChart
 │       ├── stores/       # Pinia (auth, events, alerts)
 │       └── router/       # Vue Router con auth guards
@@ -206,7 +254,7 @@ vigIA/
 ## Seguridad
 
 - Autenticacion JWT con tokens expirables (8 horas por defecto)
-- Contraseñas hasheadas con bcrypt
+- Contrasenas hasheadas con bcrypt
 - CORS configurable via variable de entorno
 - Rate limiting en endpoints costosos (PDF, ML retrain)
 - Puertos Docker solo en 127.0.0.1 (no expuestos a internet)
