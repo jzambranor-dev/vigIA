@@ -26,6 +26,11 @@ const router = createRouter({
       name: 'reports',
       component: () => import('../views/ReportsView.vue'),
     },
+    {
+      path: '/ml',
+      name: 'ml',
+      component: () => import('../views/MLView.vue'),
+    },
   ],
 })
 

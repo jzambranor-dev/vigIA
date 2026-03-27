@@ -61,6 +61,8 @@ window.__vigia_notify = (msg, type = 'error') => {
             :class="{ 'text-danger': route.name === 'events' }">Eventos</RouterLink>
           <RouterLink to="/reports" class="hover:text-danger transition-colors"
             :class="{ 'text-danger': route.name === 'reports' }">Reportes</RouterLink>
+          <RouterLink to="/ml" class="hover:text-danger transition-colors"
+            :class="{ 'text-danger': route.name === 'ml' }">ML</RouterLink>
           <div class="flex items-center gap-3 ml-4 pl-4 border-l border-accent">
             <span class="text-sm text-gray-400">
               {{ authStore.username }}
