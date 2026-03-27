@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
+import { connectWebSocket, disconnectWebSocket } from '../services/websocket'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -28,12 +29,14 @@ export const useAuthStore = defineStore('auth', {
         localStorage.setItem('vigia_username', data.username)
         localStorage.setItem('vigia_is_admin', data.is_admin)
 
-        // Configurar header global de axios
         axios.defaults.headers.common['Authorization'] = `Bearer ${data.access_token}`
+
+        // Conectar WebSocket
+        connectWebSocket()
 
         return true
       } catch (err) {
-        this.error = err.response?.data?.detail || 'Error de conexión'
+        this.error = err.response?.data?.detail || 'Error de conexion'
         return false
       } finally {
         this.loading = false
@@ -41,6 +44,8 @@ export const useAuthStore = defineStore('auth', {
     },
 
     logout() {
+      disconnectWebSocket()
+
       this.token = null
       this.username = null
       this.isAdmin = false

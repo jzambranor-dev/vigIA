@@ -3,6 +3,7 @@ import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { useRouter } from 'vue-router'
 import { ref } from 'vue'
+import { isConnected } from './services/websocket'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -51,9 +52,14 @@ window.__vigia_notify = (msg, type = 'error') => {
     <!-- Navbar -->
     <nav class="bg-secondary border-b border-accent px-6 py-4">
       <div class="flex items-center justify-between max-w-7xl mx-auto">
-        <h1 class="text-xl font-bold text-danger">
-          vigIA
-        </h1>
+        <div class="flex items-center gap-2">
+          <h1 class="text-xl font-bold text-danger">vigIA</h1>
+          <span
+            class="w-2 h-2 rounded-full"
+            :class="isConnected ? 'bg-green-500' : 'bg-red-500'"
+            :title="isConnected ? 'Conectado en tiempo real' : 'Desconectado'"
+          ></span>
+        </div>
         <div class="flex items-center gap-6">
           <RouterLink to="/" class="hover:text-danger transition-colors"
             :class="{ 'text-danger': route.name === 'home' }">Dashboard</RouterLink>

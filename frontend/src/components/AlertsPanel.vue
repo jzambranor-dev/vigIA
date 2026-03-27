@@ -1,12 +1,20 @@
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import { useAlertsStore } from '../stores/alerts'
+import { onWsMessage } from '../services/websocket'
 
 const store = useAlertsStore()
 
 onMounted(() => {
   store.fetchAlerts({ limit: 20 })
 })
+
+// Recargar alertas cuando llega una nueva via WebSocket
+const unsub = onWsMessage('alert', () => {
+  store.fetchAlerts({ limit: 20 })
+})
+
+onUnmounted(() => unsub())
 
 const severityColor = (severity) => {
   const colors = {
