@@ -35,9 +35,10 @@ class Settings(BaseSettings):
     # Logs a monitorear
     LOG_PATHS: str = "/var/log/auth.log,/var/log/syslog"
 
-    # Email (opcional)
-    SMTP_HOST: str = "smtp.gmail.com"
-    SMTP_PORT: int = 587
+    # Email (Hostinger SMTP)
+    SMTP_HOST: str = "smtp.hostinger.com"
+    SMTP_PORT: int = 465
+    SMTP_SSL: bool = True
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     ALERT_EMAIL_TO: str = ""

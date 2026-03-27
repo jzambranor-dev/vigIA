@@ -1,11 +1,17 @@
 <script setup>
 import { ref, onUnmounted } from 'vue'
 import { onWsMessage } from '../services/websocket'
+import { playAlertSound } from '../services/alertSound'
 
 const MAX_ITEMS = 15
 const feedItems = ref([])
 
 const unsub = onWsMessage('all', (msg) => {
+  // Sonido para alertas CRITICAL y HIGH
+  if (msg.type === 'alert' && (msg.data.severity === 'CRITICAL' || msg.data.severity === 'HIGH')) {
+    playAlertSound(msg.data.severity)
+  }
+
   const item = {
     id: Date.now() + Math.random(),
     type: msg.type,

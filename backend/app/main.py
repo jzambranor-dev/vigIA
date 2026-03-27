@@ -13,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from sqlalchemy import select
 
-from app.api import alerts, events, reports, stats
+from app.api import alerts, events, geo, reports, stats
 from app.api import ml as ml_api
 from app.api import auth as auth_api
 from app.auth import get_current_user, hash_password
@@ -30,6 +30,7 @@ from app.ml.predictor import initialize_predictor
 from app.models.alert import Alert as AlertModel
 from app.models.event import LogEvent
 from app.models.user import User
+from app.utils.email_sender import send_alert_email
 from app.utils.logger import setup_logging
 from app.websocket.manager import ws_manager
 
@@ -107,13 +108,18 @@ async def process_pipeline() -> None:
                     )
                     session.add(alert)
                     # Broadcast alerta por WebSocket
-                    await ws_manager.broadcast_alert({
+                    alert_payload = {
                         "id": str(alert.id),
                         "severity": alert.severity,
                         "alert_type": alert.alert_type,
                         "description": alert.description,
                         "source_ip": alert.source_ip,
-                    })
+                    }
+                    await ws_manager.broadcast_alert(alert_payload)
+
+                    # Enviar email si es CRITICAL
+                    if alert.severity == "CRITICAL":
+                        send_alert_email(alert_payload)
 
                 # 6b. Analizar secuencias temporales por IP
                 seq_alert = await sequence_analyzer.record_and_analyze(enriched)
@@ -257,6 +263,7 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(ml_api.router, prefix="/api/ml", tags=["ml"])
+app.include_router(geo.router, prefix="/api/geo", tags=["geo"])
 
 
 @app.get("/")

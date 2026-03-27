@@ -31,6 +31,11 @@ const router = createRouter({
       name: 'ml',
       component: () => import('../views/MLView.vue'),
     },
+    {
+      path: '/map',
+      name: 'map',
+      component: () => import('../views/GeoMapView.vue'),
+    },
   ],
 })
 
