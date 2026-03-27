@@ -3,7 +3,7 @@ import { ref, onUnmounted } from 'vue'
 import { onWsMessage } from '../services/websocket'
 
 const MAX_ITEMS = 15
-const events = ref([])
+const feedItems = ref([])
 
 const unsub = onWsMessage('all', (msg) => {
   const item = {
@@ -12,8 +12,10 @@ const unsub = onWsMessage('all', (msg) => {
     data: msg.data,
     time: new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
   }
-  events.value.unshift(item)
-  if (events.value.length > MAX_ITEMS) events.value.pop()
+  // Reemplazar completo para evitar problemas de reactividad
+  const updated = [item, ...feedItems.value]
+  if (updated.length > MAX_ITEMS) updated.length = MAX_ITEMS
+  feedItems.value = updated
 })
 
 onUnmounted(() => unsub())
@@ -48,12 +50,12 @@ const severityColor = (severity) => {
         <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
       </span>
     </h3>
-    <div v-if="events.length === 0" class="text-gray-500 text-sm text-center py-6">
+    <div v-if="feedItems.length === 0" class="text-gray-500 text-sm text-center py-6">
       Esperando eventos en tiempo real...
     </div>
     <div v-else class="space-y-1 max-h-96 overflow-y-auto">
       <div
-        v-for="item in events"
+        v-for="item in feedItems"
         :key="item.id"
         class="flex items-start gap-2 text-xs py-1.5 border-b border-accent/20"
         :class="{ 'bg-danger/5': item.type === 'alert' }"

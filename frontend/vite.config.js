@@ -7,6 +7,7 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3000,
     allowedHosts: ['vigia.devs-rick.com'],
+    hmr: false,
     proxy: {
       '/api': {
         target: 'http://backend:8000',

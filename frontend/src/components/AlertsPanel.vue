@@ -1,20 +1,32 @@
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useAlertsStore } from '../stores/alerts'
 import { onWsMessage } from '../services/websocket'
 
 const store = useAlertsStore()
+const newAlertCount = ref(0)
 
 onMounted(() => {
   store.fetchAlerts({ limit: 20 })
 })
 
-// Recargar alertas cuando llega una nueva via WebSocket
+// Throttle: acumular alertas nuevas y refetch cada 5 segundos maximo
+let refreshTimer = null
 const unsub = onWsMessage('alert', () => {
-  store.fetchAlerts({ limit: 20 })
+  newAlertCount.value++
+  if (!refreshTimer) {
+    refreshTimer = setTimeout(() => {
+      store.fetchAlerts({ limit: 20 })
+      newAlertCount.value = 0
+      refreshTimer = null
+    }, 5000)
+  }
 })
 
-onUnmounted(() => unsub())
+onUnmounted(() => {
+  unsub()
+  if (refreshTimer) clearTimeout(refreshTimer)
+})
 
 const severityColor = (severity) => {
   const colors = {
@@ -29,6 +41,9 @@ const severityColor = (severity) => {
 
 <template>
   <div>
+    <div v-if="newAlertCount > 0" class="mb-3 text-sm text-yellow-400">
+      +{{ newAlertCount }} alertas nuevas (actualizando...)
+    </div>
     <div v-if="store.loading" class="text-center py-10">Cargando alertas...</div>
     <div v-else class="space-y-3">
       <div
