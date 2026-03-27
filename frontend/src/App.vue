@@ -52,14 +52,17 @@ window.__vigia_notify = (msg, type = 'error') => {
     <!-- Navbar -->
     <nav class="bg-secondary border-b border-accent px-6 py-4">
       <div class="flex items-center justify-between max-w-7xl mx-auto">
-        <div class="flex items-center gap-2">
-          <h1 class="text-xl font-bold text-danger">vigIA</h1>
+        <RouterLink to="/" class="flex items-center gap-2.5 group">
+          <img src="/logo.svg" alt="vigIA" class="w-8 h-8" />
+          <span class="text-xl font-bold">
+            <span class="text-white group-hover:text-gray-200 transition-colors">vig</span><span class="text-danger">IA</span>
+          </span>
           <span
             class="w-2 h-2 rounded-full"
             :class="isConnected ? 'bg-green-500' : 'bg-red-500'"
             :title="isConnected ? 'Conectado en tiempo real' : 'Desconectado'"
           ></span>
-        </div>
+        </RouterLink>
         <div class="flex items-center gap-6">
           <RouterLink to="/" class="hover:text-danger transition-colors"
             :class="{ 'text-danger': route.name === 'home' }">Dashboard</RouterLink>

@@ -87,20 +87,21 @@ onUnmounted(() => {
 
 const chartOptions = {
   responsive: true,
+  maintainAspectRatio: false,
   animation: { duration: 300 },
   plugins: {
     legend: {
-      labels: { color: '#fff', usePointStyle: true, pointStyle: 'line' },
+      labels: { color: '#fff', usePointStyle: true, pointStyle: 'line', boxWidth: 20, font: { size: 11 } },
     },
   },
   scales: {
     x: {
-      ticks: { color: '#6b7280', maxRotation: 0, maxTicksLimit: 6 },
+      ticks: { color: '#6b7280', maxRotation: 0, maxTicksLimit: 6, font: { size: 10 } },
       grid: { color: '#1a1a2e' },
     },
     y: {
       beginAtZero: true,
-      ticks: { color: '#6b7280', stepSize: 1 },
+      ticks: { color: '#6b7280', stepSize: 1, font: { size: 10 } },
       grid: { color: '#1a1a2e' },
     },
   },
@@ -108,11 +109,13 @@ const chartOptions = {
 </script>
 
 <template>
-  <div class="bg-secondary rounded-lg p-6 border border-accent">
-    <h3 class="text-lg font-semibold mb-4">
+  <div class="bg-secondary rounded-lg p-4 border border-accent">
+    <h3 class="text-sm font-semibold mb-2">
       Actividad en Tiempo Real
-      <span class="text-xs text-gray-500 font-normal ml-2">(cada 10 segundos)</span>
+      <span class="text-xs text-gray-500 font-normal ml-1">(cada 10s)</span>
     </h3>
-    <Line :data="chartData" :options="chartOptions" />
+    <div class="h-40">
+      <Line :data="chartData" :options="chartOptions" />
+    </div>
   </div>
 </template>
