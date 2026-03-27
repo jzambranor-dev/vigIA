@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import queue
 import uuid
 from contextlib import asynccontextmanager
 
@@ -43,15 +44,15 @@ alert_engine = AlertEngine()
 detector = AnomalyDetector()
 sequence_analyzer = SequenceAnalyzer()
 
-# Cola async para procesar líneas de log
-log_queue: asyncio.Queue = asyncio.Queue()
+# Cola thread-safe para comunicar el thread del ingester con el event loop async
+_thread_queue: queue.Queue = queue.Queue(maxsize=10000)
 
 
 def on_new_log_line(line: str, filepath: str) -> None:
-    """Callback del ingester: encola la línea para procesamiento async."""
+    """Callback del ingester (ejecutado en thread de watchdog): encola de forma thread-safe."""
     try:
-        log_queue.put_nowait((line, filepath))
-    except asyncio.QueueFull:
+        _thread_queue.put_nowait((line, filepath))
+    except queue.Full:
         logger.warning("Cola de logs llena, descartando línea")
 
 
@@ -59,7 +60,12 @@ async def process_pipeline() -> None:
     """Worker que procesa líneas de log del queue a través del pipeline."""
     while True:
         try:
-            line, filepath = await log_queue.get()
+            # Drenar la cola thread-safe hacia el pipeline async
+            try:
+                line, filepath = _thread_queue.get_nowait()
+            except queue.Empty:
+                await asyncio.sleep(0.5)
+                continue
 
             # 1. Parse
             parsed = parser.parse(line, filepath)
