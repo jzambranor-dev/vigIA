@@ -18,7 +18,8 @@ export const useEventsStore = defineStore('events', {
         this.events = data.items
         this.total = data.total
       } catch (err) {
-        this.error = err.message
+        this.error = err.response?.data?.detail || err.message
+        if (window.__vigia_notify) window.__vigia_notify(this.error)
       } finally {
         this.loading = false
       }

@@ -1,9 +1,16 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
+import LoginView from '../views/LoginView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    {
+      path: '/login',
+      name: 'login',
+      component: LoginView,
+      meta: { public: true },
+    },
     {
       path: '/',
       name: 'home',
@@ -20,6 +27,23 @@ const router = createRouter({
       component: () => import('../views/ReportsView.vue'),
     },
   ],
+})
+
+// Guard de autenticación
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('vigia_token')
+
+  if (to.meta.public) {
+    if (token && to.name === 'login') {
+      next({ name: 'home' })
+    } else {
+      next()
+    }
+  } else if (!token) {
+    next({ name: 'login' })
+  } else {
+    next()
+  }
 })
 
 export default router

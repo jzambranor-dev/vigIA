@@ -1,21 +1,23 @@
 <script setup>
 import { ref } from 'vue'
+import axios from 'axios'
 
 const downloading = ref(false)
 
 const downloadReport = async () => {
   downloading.value = true
   try {
-    const response = await fetch('/api/reports/pdf')
-    const blob = await response.blob()
-    const url = window.URL.createObjectURL(blob)
+    const response = await axios.get('/api/reports/pdf', { responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([response.data]))
     const a = document.createElement('a')
     a.href = url
     a.download = 'reporte_seguridad.pdf'
     a.click()
     window.URL.revokeObjectURL(url)
+    if (window.__vigia_notify) window.__vigia_notify('Reporte descargado', 'success')
   } catch (err) {
-    console.error('Error descargando reporte:', err)
+    const msg = err.response?.data?.detail || 'Error descargando reporte'
+    if (window.__vigia_notify) window.__vigia_notify(msg)
   } finally {
     downloading.value = false
   }

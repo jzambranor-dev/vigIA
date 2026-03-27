@@ -7,8 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.models.alert import Alert
+from app.models.user import User
 from app.schemas.alert import AlertAcknowledge, AlertList, AlertResponse
 
 router = APIRouter()
@@ -22,6 +24,7 @@ async def list_alerts(
     alert_type: str | None = None,
     acknowledged: bool | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Listar alertas con filtros opcionales."""
     query = select(Alert)
@@ -47,6 +50,7 @@ async def list_alerts(
 async def get_alert(
     alert_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Obtener una alerta por su ID."""
     result = await db.execute(select(Alert).where(Alert.id == alert_id))
@@ -61,6 +65,7 @@ async def acknowledge_alert(
     alert_id: UUID,
     body: AlertAcknowledge,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Marcar una alerta como reconocida."""
     result = await db.execute(select(Alert).where(Alert.id == alert_id))

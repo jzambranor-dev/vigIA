@@ -2,24 +2,33 @@
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import get_current_user, require_admin
 from app.database import get_db
 from app.models.event import LogEvent
+from app.models.user import User
 from app.ml.feature_extractor import FEATURE_NAMES, N_FEATURES, extract_features
 from app.ml.trainer import train_from_events, _infer_label
 
 logger = logging.getLogger(__name__)
 
+limiter = Limiter(key_func=get_remote_address)
+
 router = APIRouter()
 
 
 @router.post("/retrain")
+@limiter.limit("5/hour")
 async def retrain_models(
+    request: Request,
     max_events: int = 5000,
     db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin),
 ):
     """Re-entrena los modelos ML con eventos recientes de la base de datos."""
     # Obtener eventos
@@ -72,7 +81,7 @@ async def retrain_models(
 
 
 @router.get("/status")
-async def ml_status():
+async def ml_status(current_user: User = Depends(get_current_user)):
     """Estado actual de los modelos ML."""
     from app.ml.predictor import detector
     from pathlib import Path
@@ -99,7 +108,7 @@ async def ml_status():
 
 
 @router.post("/predict")
-async def predict_event(event: dict):
+async def predict_event(event: dict, current_user: User = Depends(get_current_user)):
     """Predice anomalía y clasifica un evento manualmente (para testing)."""
     from app.ml.predictor import detector
 

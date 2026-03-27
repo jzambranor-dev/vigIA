@@ -5,11 +5,17 @@ import logging
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from sqlalchemy import select
 
 from app.api import alerts, events, reports, stats
 from app.api import ml as ml_api
+from app.api import auth as auth_api
+from app.auth import get_current_user, hash_password
 from app.config import settings
 from app.core.alert_engine import AlertEngine
 from app.core.detector import AnomalyDetector
@@ -22,10 +28,14 @@ from app.database import AsyncSessionLocal, engine
 from app.ml.predictor import initialize_predictor
 from app.models.alert import Alert as AlertModel
 from app.models.event import LogEvent
+from app.models.user import User
 from app.utils.logger import setup_logging
 from app.websocket.manager import ws_manager
 
 logger = logging.getLogger(__name__)
+
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 # Componentes del pipeline
 parser = LogParser()
@@ -141,11 +151,39 @@ async def process_pipeline() -> None:
             logger.exception("Error procesando línea de log")
 
 
+async def seed_admin_user() -> None:
+    """Crear usuario admin por defecto si no existe."""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(User).where(User.username == settings.ADMIN_USERNAME)
+        )
+        if result.scalar_one_or_none() is None:
+            admin = User(
+                username=settings.ADMIN_USERNAME,
+                hashed_password=hash_password(settings.ADMIN_PASSWORD),
+                is_active=True,
+                is_admin=True,
+            )
+            session.add(admin)
+            await session.commit()
+            logger.info("Usuario admin '%s' creado", settings.ADMIN_USERNAME)
+        else:
+            logger.info("Usuario admin '%s' ya existe", settings.ADMIN_USERNAME)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Conectar servicios al iniciar, limpiar al apagar."""
     setup_logging("DEBUG" if settings.DEBUG else "INFO")
     logger.info("Iniciando Log Analyzer AI...")
+
+    # Crear tablas nuevas (users) si no existen
+    from app.database import Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    # Seed admin user
+    await seed_admin_user()
 
     # Cargar modelo ML
     initialize_predictor()
@@ -187,20 +225,27 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Log Analyzer AI",
     description="Sistema de análisis de logs con IA para detección de anomalías",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
-# CORS
+# Rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# CORS dinámico desde settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Routers
+# Routers — Auth (público)
+app.include_router(auth_api.router, prefix="/api/auth", tags=["auth"])
+
+# Routers — Protegidos con JWT
 app.include_router(events.router, prefix="/api/events", tags=["events"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
@@ -210,12 +255,35 @@ app.include_router(ml_api.router, prefix="/api/ml", tags=["ml"])
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "project": "Log Analyzer AI"}
+    return {"status": "ok", "project": "Log Analyzer AI", "version": "0.2.0"}
+
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint para Docker y monitoreo."""
+    return {"status": "healthy"}
 
 
 @app.websocket("/ws/events")
-async def websocket_events(websocket: WebSocket):
+async def websocket_events(websocket: WebSocket, token: str = Query(None)):
     """WebSocket endpoint para streaming de eventos en tiempo real."""
+    # Validar token JWT para WebSocket
+    if token:
+        try:
+            from jose import jwt as jose_jwt
+            payload = jose_jwt.decode(
+                token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+            )
+            if payload.get("sub") is None:
+                await websocket.close(code=4001, reason="Token inválido")
+                return
+        except Exception:
+            await websocket.close(code=4001, reason="Token inválido o expirado")
+            return
+    else:
+        await websocket.close(code=4001, reason="Token requerido")
+        return
+
     await ws_manager.connect(websocket)
     try:
         while True:

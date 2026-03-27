@@ -11,7 +11,7 @@ from app.config import settings
 from app.database import Base
 
 # Importar modelos para que Alembic los detecte
-from app.models import LogEvent, Alert  # noqa: F401
+from app.models import LogEvent, Alert, User  # noqa: F401
 
 config = context.config
 

@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     API_PORT: int = 8000
     DEBUG: bool = False
 
+    # JWT Auth
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 480
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str = "admin"
+
+    # CORS — orígenes permitidos (separados por coma)
+    CORS_ORIGINS: str = "https://vigia.devs-rick.com"
+
     # Logs a monitorear
     LOG_PATHS: str = "/var/log/auth.log,/var/log/syslog"
 
@@ -50,6 +59,10 @@ class Settings(BaseSettings):
     @property
     def log_paths_list(self) -> list[str]:
         return [p.strip() for p in self.LOG_PATHS.split(",") if p.strip()]
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

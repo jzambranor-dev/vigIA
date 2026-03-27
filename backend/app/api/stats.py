@@ -4,15 +4,20 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.models.alert import Alert
 from app.models.event import LogEvent
+from app.models.user import User
 
 router = APIRouter()
 
 
 @router.get("/summary")
-async def get_summary(db: AsyncSession = Depends(get_db)):
+async def get_summary(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Resumen general del sistema."""
     total_events = (
         await db.execute(select(func.count(LogEvent.id)))

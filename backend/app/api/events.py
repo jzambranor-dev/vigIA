@@ -6,8 +6,10 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.models.event import LogEvent
+from app.models.user import User
 from app.schemas.event import LogEventList, LogEventResponse
 
 router = APIRouter()
@@ -21,6 +23,7 @@ async def list_events(
     source_ip: str | None = None,
     is_anomaly: bool | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Listar eventos de log con filtros opcionales."""
     query = select(LogEvent)
@@ -48,6 +51,7 @@ async def list_events(
 async def get_event(
     event_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Obtener un evento por su ID."""
     result = await db.execute(select(LogEvent).where(LogEvent.id == event_id))
